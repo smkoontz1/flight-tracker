@@ -2,6 +2,7 @@
 
 import { JSX, useEffect, useState } from 'react'
 import { Stage, Layer, Rect, Circle, Line, Text } from 'react-konva'
+import { useStateVectors } from '../../data/hooks/useStateVectors'
 
 interface GeoCoordinates {
   latitude: number
@@ -13,6 +14,13 @@ interface PixelCoordinates {
   y: number
 }
 
+interface BoundingBox {
+  minLatitude: number
+  maxLatitude: number
+  minLongitude: number
+  maxLongitude: number
+}
+
 export default function Flights() {
   const gridWidth = 1000
   const gridHeight = 1000
@@ -21,24 +29,45 @@ export default function Flights() {
   const axisBuffer = 50
   const gridStartX = axisBuffer
   const gridStartY = 0
+  const boxRadius = 0.5
   
-  const [currentLocation, setCurrentLocation] = useState<GeoCoordinates>({} as GeoCoordinates)
+  const [currentLocation, setCurrentLocation] = useState<GeoCoordinates>({ latitude: 0, longitude: 0 })
+  const [boundingBox, setBoundingBox] = useState<BoundingBox>({ minLatitude: 0, maxLatitude: 0, minLongitude: 0, maxLongitude: 0 })
+  
+  const { data } = useStateVectors({
+    lamin: boundingBox?.minLatitude,
+    lamax: boundingBox?.maxLatitude,
+    lomin: boundingBox?.minLongitude,
+    lomax: boundingBox?.maxLongitude
+  })
+
+  useEffect(() => {
+    console.log('Got state vectors', data)
+  }, [data])
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(position => {
-      setCurrentLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude })
+      const currentLatitude = position.coords.latitude
+      const currentLongitude = position.coords.longitude
+
+      setCurrentLocation({ latitude: currentLatitude, longitude: currentLongitude })
+
+      const minLatitude = currentLatitude - boxRadius
+      const maxLatitude = currentLatitude + boxRadius
+      const minLongitude = currentLongitude - boxRadius
+      const maxLongitude = currentLongitude + boxRadius
+
+      setBoundingBox({
+        minLatitude,
+        maxLatitude,
+        minLongitude,
+        maxLongitude
+      })
     })
   }, [])
   
-  const boxRadius = 0.5
-  
-  const minLatitude = currentLocation.latitude - boxRadius
-  const maxLatitude = currentLocation.latitude + boxRadius
-  const minLongitude = currentLocation.longitude - boxRadius
-  const maxLongitude = currentLocation.longitude + boxRadius
-  
-  const latitudeLabelInterval = (maxLatitude - minLatitude) / latitudeCount
-  const longitudeLabelInterval = (maxLongitude - minLongitude) / longitudeCount
+  const latitudeLabelInterval = (boundingBox.maxLatitude - boundingBox.minLatitude) / latitudeCount
+  const longitudeLabelInterval = (boundingBox.maxLongitude - boundingBox.minLongitude) / longitudeCount
   
   const latitudeInterval = gridHeight / latitudeCount
   const longitudeInterval = gridWidth / longitudeCount
@@ -46,12 +75,12 @@ export default function Flights() {
   let latitudeLines: JSX.Element[] = []
   let longitudeLines: JSX.Element[] = []
   
-  let latLabel = minLatitude - latitudeLabelInterval
-  let lonLabel = minLongitude - longitudeLabelInterval
+  let latLabel = boundingBox.minLatitude - latitudeLabelInterval
+  let lonLabel = boundingBox.minLongitude - longitudeLabelInterval
   
   const toPixelCoordinates = (coordinates: GeoCoordinates): PixelCoordinates => {
-    const y = (coordinates.latitude - minLatitude) * 1000
-    const x = ((coordinates.longitude - minLongitude) * 1000) + axisBuffer
+    const y = (coordinates.latitude - boundingBox.minLatitude) * 1000
+    const x = ((coordinates.longitude - boundingBox.minLongitude) * 1000) + axisBuffer
 
     return { x, y }
   }
@@ -85,6 +114,16 @@ export default function Flights() {
 
   const currentLocationPixels = toPixelCoordinates(currentLocation)
 
+  let planeLocations: JSX.Element[] = []
+
+  if (data) {
+    planeLocations = data.map(s => {
+      const pixelCoordinates = toPixelCoordinates({ latitude: s.latitude, longitude: s.longitude })
+
+      return <Circle radius={10} fill='green' x={pixelCoordinates.x} y={pixelCoordinates.y} />
+    })
+  }
+
   return (
     <main className='bg-black h-screen'>
       <div className='h-screen flex justify-center items-center'>
@@ -94,6 +133,7 @@ export default function Flights() {
             {latitudeLines}
             {longitudeLines}
             <Circle radius={10} fill='blue' x={currentLocationPixels.x} y={currentLocationPixels.y} />
+            {planeLocations}
           </Layer>
         </Stage>
       </div>

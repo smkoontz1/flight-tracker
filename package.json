@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.62.10",
+    "axios": "^1.7.9",
     "canvas": "^3.0.0-rc3",
     "konva": "^9.3.18",
     "next": "15.1.2",
