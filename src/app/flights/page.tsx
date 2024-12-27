@@ -21,6 +21,21 @@ interface BoundingBox {
   maxLongitude: number
 }
 
+interface Airport {
+  iataCode: string
+  coordinates: GeoCoordinates
+}
+
+const KNOWN_AIRPORTS: Airport[] = [
+  {
+    iataCode: 'OMA',
+    coordinates: {
+      latitude: 41.30208708810547,
+      longitude: -95.8943447597799
+    }
+  }  
+]
+
 export default function Flights() {
   const gridWidth = 1000
   const gridHeight = 1000
@@ -40,10 +55,6 @@ export default function Flights() {
     lomin: boundingBox?.minLongitude,
     lomax: boundingBox?.maxLongitude
   })
-
-  useEffect(() => {
-    console.log('Got state vectors', data)
-  }, [data])
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(position => {
@@ -75,24 +86,24 @@ export default function Flights() {
   let latitudeLines: JSX.Element[] = []
   let longitudeLines: JSX.Element[] = []
   
-  let latLabel = boundingBox.minLatitude - latitudeLabelInterval
+  let latLabel = boundingBox.maxLatitude + latitudeLabelInterval
   let lonLabel = boundingBox.minLongitude - longitudeLabelInterval
   
   const toPixelCoordinates = (coordinates: GeoCoordinates): PixelCoordinates => {
-    const y = (coordinates.latitude - boundingBox.minLatitude) * 1000
+    const y = (boundingBox.maxLatitude - coordinates.latitude) * 1000
     const x = ((coordinates.longitude - boundingBox.minLongitude) * 1000) + axisBuffer
 
     return { x, y }
   }
 
   for (let y = gridStartY; y <= gridHeight; y += latitudeInterval) {
-    latLabel += latitudeLabelInterval
+    latLabel -= latitudeLabelInterval
     
     latitudeLines = [
       ...latitudeLines,
       <>
-        <Text text={latLabel.toFixed(2)} x={0} y={y} fill='white' offsetX={-10} />
-        <Line points={[gridStartX, y, gridWidth + axisBuffer, y]} stroke='white' />
+        <Text text={latLabel.toFixed(2)} x={0} y={y} fill='gray' offsetX={-10} />
+        <Line points={[gridStartX, y, gridWidth + axisBuffer, y]} stroke='gray' />
       </>
     ]
   }
@@ -103,8 +114,8 @@ export default function Flights() {
     longitudeLines = [
       ...longitudeLines,
       <>
-        <Text text={lonLabel.toFixed(2)} x={x} y={gridStartY + gridHeight} fill='white' rotation={270} offsetX={40} offsetY={10} />
-        <Line points={[x, gridStartY, x, gridHeight]} stroke='white' />
+        <Text text={lonLabel.toFixed(2)} x={x} y={gridStartY + gridHeight} fill='gray' rotation={270} offsetX={40} offsetY={10} />
+        <Line points={[x, gridStartY, x, gridHeight]} stroke='gray' />
       </>
     ]
   }
@@ -120,9 +131,25 @@ export default function Flights() {
     planeLocations = data.map(s => {
       const pixelCoordinates = toPixelCoordinates({ latitude: s.latitude, longitude: s.longitude })
 
-      return <Circle radius={10} fill='green' x={pixelCoordinates.x} y={pixelCoordinates.y} />
+      return (
+        <>
+          <Circle radius={8} fill='green' x={pixelCoordinates.x} y={pixelCoordinates.y} />
+          <Text text={s.callsign.trim()} x={pixelCoordinates.x + 8} y={pixelCoordinates.y} fill='white' />
+        </>
+      )
     })
   }
+
+  let airports: JSX.Element[] = KNOWN_AIRPORTS.map(a => {
+    const pixelCoordinates = toPixelCoordinates(a.coordinates)
+
+    return (
+      <>
+        <Circle radius={8} fill='yellow' x={pixelCoordinates.x} y={pixelCoordinates.y} />
+        <Text text={a.iataCode} x={pixelCoordinates.x + 8} y={pixelCoordinates.y} fill='white' />
+      </>
+    )
+  })
 
   return (
     <main className='bg-black h-screen'>
@@ -130,10 +157,15 @@ export default function Flights() {
         <Stage width={stageWidth} height={stageHeight}>
           <Layer>
             <Rect width={stageWidth} height={stageHeight} fill='black' />
-            {latitudeLines}
-            {longitudeLines}
-            <Circle radius={10} fill='blue' x={currentLocationPixels.x} y={currentLocationPixels.y} />
-            {planeLocations}
+            {data &&
+              <>
+                {latitudeLines}
+                {longitudeLines}
+                <Circle radius={8} fill='blue' x={currentLocationPixels.x} y={currentLocationPixels.y} />
+                {airports}
+                {planeLocations}
+              </>
+            }
           </Layer>
         </Stage>
       </div>
